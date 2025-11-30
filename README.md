@@ -18,6 +18,17 @@ Python 3.9+ and dependencies in `requirements.txt` (pkuseg, spaCy, pypinyin)
 
 ## Installation
 
+### Option 1: Docker (Recommended)
+
+```bash
+git clone https://github.com/chelsea6502/chinese-checker.git
+cd chinese-checker
+chmod +x run.sh
+./run.sh
+```
+
+### Option 2: Local Installation
+
 ```bash
 git clone https://github.com/chelsea6502/chinese-checker.git
 cd chinese-checker
@@ -27,6 +38,15 @@ pip install -r requirements.txt
 Models (pkuseg + spaCy zh_core_web_sm) download automatically on first run.
 
 ## Usage
+
+### Docker
+
+1. Place Chinese text files (`.txt`) in the `input/` directory
+2. Run: `./run.sh`
+
+The volumes are mounted, so you can add/modify files in `input/`, `known/`, and `unknown/` directories without rebuilding.
+
+### Local
 
 1. Place Chinese text files (`.txt`) in the `input/` directory
 2. Run: `python script.py`

@@ -10,6 +10,8 @@ ENV/
 env/
 /books
 /data/*.txt
+# Ignore all files in input/ directory except example.txt
+input/*
 !input/example.txt
 output.txt
 mega_book.py

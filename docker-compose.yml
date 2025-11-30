@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  chinese-checker:
+    build: .
+    container_name: chinese-checker
+    volumes:
+      # Mount directories to allow easy file management
+      - ./input:/app/input
+      - ./known:/app/known
+      - ./unknown:/app/unknown
+      - ./definitions.txt:/app/definitions.txt:ro
+    environment:
+      - PYTHONUNBUFFERED=1
+    stdin_open: true
+    tty: true
