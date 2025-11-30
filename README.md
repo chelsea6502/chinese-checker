@@ -1,4 +1,4 @@
-# Chinese Comprehension Checker
+# Chinese Checker
 
 Analyze Chinese text from your clipboard to gauge comprehension based on your known words.
 
@@ -19,8 +19,8 @@ Python 3.9+ and dependencies in `requirements.txt` (pkuseg, spaCy, pyperclip, py
 ## Installation
 
 ```bash
-git clone https://github.com/chelsea6502/chinese-comprehension.git
-cd chinese-comprehension
+git clone https://github.com/chelsea6502/chinese-checker.git
+cd chinese-checker
 pip install -r requirements.txt
 ```
 

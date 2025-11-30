@@ -1,5 +1,5 @@
 """
-Chinese Comprehension Checker
+Chinese Checker
 
 Analyzes Chinese text from clipboard to calculate comprehension based on known words.
 Uses dynamic programming for optimal word segmentation.
