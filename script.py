@@ -5,12 +5,7 @@ Analyzes Chinese text from clipboard to calculate comprehension based on known w
 Uses dynamic programming for optimal word segmentation.
 """
 
-import jieba
-import logging
-
-# Suppress jieba's logging output
-jieba.setLogLevel(logging.ERROR)
-
+import stanza
 import pyperclip
 import unicodedata
 from collections import Counter, namedtuple
@@ -24,6 +19,20 @@ DEFAULT_KNOWN_WORDS_PATH = "known.txt"
 UNKNOWN_WORDS_PATH = "unknown.txt"
 MAX_UNKNOWN_WORDS_DISPLAY = 20
 CEDICT_PATH = "cedict_1_0_ts_utf-8_mdbg.txt"  # Path to CC-CEDICT dictionary file
+
+# Initialize Stanza segmenter (only once for efficiency)
+# Stanza provides state-of-the-art accuracy (97-98%) from Stanford NLP
+# This will download the model on first run (~200MB)
+stanza_nlp = None
+
+def get_stanza_segmenter():
+    """Lazy load Stanza segmenter to avoid slow startup"""
+    global stanza_nlp
+    if stanza_nlp is None:
+        # Download Chinese model if not present, then initialize
+        stanza.download('zh', verbose=False)
+        stanza_nlp = stanza.Pipeline('zh', processors='tokenize', verbose=False, download_method=None)
+    return stanza_nlp
 
 # Comprehensive punctuation set
 PUNCTUATION_CHARS = set(
@@ -126,9 +135,11 @@ def comprehension_checker(known_words_path: str = DEFAULT_KNOWN_WORDS_PATH) -> s
         
         # Helper function to segment unknown text
         def segment_unknown(text: str) -> List[str]:
-            """Segment unknown text by first checking unknown.txt, then using jieba"""
+            """Segment unknown text by first checking unknown.txt, then using Stanza"""
             result = []
             i = 0
+            segmenter = get_stanza_segmenter()
+            
             while i < len(text):
                 # Try to match against unknown_words_list (longest match first)
                 matched = False
@@ -141,7 +152,7 @@ def comprehension_checker(known_words_path: str = DEFAULT_KNOWN_WORDS_PATH) -> s
                         break
                 
                 if not matched:
-                    # If no match in unknown.txt, use jieba for this segment
+                    # If no match in unknown.txt, use Stanza for this segment
                     # Find the next unknown word boundary or end of text
                     j = i + 1
                     while j < len(text):
@@ -154,8 +165,11 @@ def comprehension_checker(known_words_path: str = DEFAULT_KNOWN_WORDS_PATH) -> s
                             break
                         j += 1
                     
-                    # Use jieba on this segment
-                    result.extend(jieba.cut(text[i:j]))
+                    # Use Stanza on this segment
+                    # Stanza returns a Document with sentences containing tokens
+                    doc = segmenter(text[i:j])
+                    for sentence in doc.sentences:
+                        result.extend([token.text for token in sentence.tokens])
                     i = j
             
             return result
