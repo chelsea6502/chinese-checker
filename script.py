@@ -1,13 +1,12 @@
 """
 Chinese Checker
 
-Analyzes Chinese text from clipboard to calculate comprehension based on known words.
+Analyzes Chinese text from input files to calculate comprehension based on known words.
 Uses dynamic programming for optimal word segmentation.
 """
 
 import spacy_pkuseg as pkuseg
 import spacy
-import pyperclip
 import unicodedata
 from collections import Counter, namedtuple
 from pypinyin import pinyin, Style
@@ -30,6 +29,7 @@ logger = logging.getLogger(__name__)
 MAX_WORD_LENGTH = 4
 KNOWN_WORDS_DIR = "known"
 UNKNOWN_WORDS_DIR = "unknown"
+INPUT_DIR = "input"
 MAX_UNKNOWN_WORDS_DISPLAY = 20
 CEDICT_PATH = "definitions.txt"  # Path to CC-CEDICT dictionary file
 
@@ -134,9 +134,16 @@ def load_cedict(path: str) -> Dict[str, str]:
     return cedict
 
 
-def comprehension_checker(known_words_dir: str = KNOWN_WORDS_DIR) -> str:
-    """Check comprehension of Chinese text from clipboard against known words.
+def comprehension_checker(text: str, known_words_dir: str = KNOWN_WORDS_DIR) -> str:
+    """Check comprehension of Chinese text against known words.
     Automatically excludes proper nouns (names, places) for accurate comprehension measurement.
+    
+    Args:
+        text: The Chinese text to analyze
+        known_words_dir: Directory containing known words files
+    
+    Returns:
+        Analysis report as a string
     """
     logger.info("Starting analysis...")
     
@@ -177,9 +184,8 @@ def comprehension_checker(known_words_dir: str = KNOWN_WORDS_DIR) -> str:
                                 unknown_words_list.add(word)
             logger.info(f"Loaded {len(unknown_words_list)} unknown words from {len(txt_files)} file(s)")
         
-        text = pyperclip.paste()
         if not text:
-            raise ValueError("Clipboard is empty")
+            raise ValueError("No text provided")
         
         # Clean up: remove whitespace and diacritics
         normalized = unicodedata.normalize("NFKD", "".join(text.split()))
@@ -187,7 +193,7 @@ def comprehension_checker(known_words_dir: str = KNOWN_WORDS_DIR) -> str:
         logger.info(f"Processing {len(cleaned)} characters...")
         
         if not cleaned:
-            return "Error: No Chinese text found in clipboard after filtering"
+            return "Error: No Chinese text found after filtering"
         
         # DP tokenization to maximize known word coverage
         n = len(cleaned)
@@ -288,7 +294,7 @@ def comprehension_checker(known_words_dir: str = KNOWN_WORDS_DIR) -> str:
         words = [word for word, _ in result if is_valid(word)]
         
         if not words:
-            return "Error: No Chinese text found in clipboard after filtering"
+            return "Error: No Chinese text found after filtering"
         
         # Calculate stats
         word_counts = Counter(words)
@@ -369,7 +375,67 @@ def comprehension_checker(known_words_dir: str = KNOWN_WORDS_DIR) -> str:
         return f"Error: An unexpected error occurred: {str(e)}"
 
 
+def process_input_files(input_dir: str = INPUT_DIR) -> None:
+    """Process all txt files in the input directory and generate reports.
+    
+    Args:
+        input_dir: Directory containing input text files to analyze
+    """
+    if not os.path.exists(input_dir):
+        logger.error(f"Input directory not found: '{input_dir}'")
+        print(f"Error: Input directory '{input_dir}' does not exist.")
+        print(f"Please create the directory and add .txt files to analyze.")
+        return
+    
+    if not os.path.isdir(input_dir):
+        logger.error(f"'{input_dir}' is not a directory")
+        print(f"Error: '{input_dir}' is not a directory.")
+        return
+    
+    # Get all txt files in the input directory
+    txt_files = [f for f in os.listdir(input_dir) if f.endswith('.txt')]
+    
+    if not txt_files:
+        logger.warning(f"No .txt files found in '{input_dir}'")
+        print(f"No .txt files found in '{input_dir}' directory.")
+        print(f"Please add .txt files containing Chinese text to analyze.")
+        return
+    
+    logger.info(f"Found {len(txt_files)} file(s) to process")
+    
+    # Process each file
+    for txt_file in txt_files:
+        file_path = os.path.join(input_dir, txt_file)
+        logger.info(f"\n{'='*60}")
+        logger.info(f"Processing: {txt_file}")
+        logger.info(f"{'='*60}")
+        
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                text = f.read()
+            
+            if not text.strip():
+                logger.warning(f"File '{txt_file}' is empty, skipping")
+                print(f"\n[{txt_file}] - SKIPPED (empty file)")
+                continue
+            
+            # Generate report
+            print(f"\n{'='*60}")
+            print(f"File: {txt_file}")
+            print('='*60)
+            result = comprehension_checker(text)
+            print(result)
+            
+        except Exception as e:
+            logger.error(f"Error processing '{txt_file}': {e}")
+            print(f"\n[{txt_file}] - ERROR: {e}")
+    
+    logger.info(f"\n{'='*60}")
+    logger.info("All files processed")
+    logger.info(f"{'='*60}")
+
+
 if __name__ == "__main__":
     logger.info("Script started")
-    print(comprehension_checker())
+    process_input_files()
     logger.info("Script finished")

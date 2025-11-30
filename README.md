@@ -1,20 +1,20 @@
 # Chinese Checker
 
-Analyze Chinese text from your clipboard to gauge comprehension based on your known words.
+Analyze Chinese text from input files to gauge comprehension based on your known words.
 
 ## Acknowledgments
 
 This project is based on [Destaq/chinese-comprehension](https://github.com/Destaq/chinese-comprehension) as the starting point.
 
 ## Features
-- Clipboard text analysis with comprehension percentage
+- Batch text file analysis with comprehension percentage
 - pkuseg word segmentation (~97% accuracy)
 - Automatic proper noun detection (excludes names/places)
 - Unknown words listed with pinyin, frequency, and definitions
 - Organize known/unknown words across multiple `.txt` files
 
 ## Requirements
-Python 3.9+ and dependencies in `requirements.txt` (pkuseg, spaCy, pyperclip, pypinyin)
+Python 3.9+ and dependencies in `requirements.txt` (pkuseg, spaCy, pypinyin)
 
 ## Installation
 
@@ -28,8 +28,10 @@ Models (pkuseg + spaCy zh_core_web_sm) download automatically on first run.
 
 ## Usage
 
-1. Copy Chinese text to clipboard
+1. Place Chinese text files (`.txt`) in the `input/` directory
 2. Run: `python script.py`
+
+The script will process all `.txt` files in the `input/` directory and generate a comprehension report for each file.
 
 ### Known Words Directory
 Create `.txt` files in the `known/` directory with one word per line. You can organize words across multiple files:
@@ -62,9 +64,13 @@ Entries in `known/` files take priority over `unknown/` files.
 ## Example Output
 
 ```
+============================================================
+File: story.txt
+============================================================
+
 Word Count: 1523
 Total Unique Words: 487
-Comprehension: 92.3%
+Comprehension: 92.3% - 🟢 Optimal (i+1)
 Unique Unknown Words: 23
 
 === Unknown Words (by frequency) ===
