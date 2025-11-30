@@ -31,7 +31,7 @@ MAX_WORD_LENGTH = 4
 DEFAULT_KNOWN_WORDS_PATH = "known.txt"
 UNKNOWN_WORDS_PATH = "unknown.txt"
 MAX_UNKNOWN_WORDS_DISPLAY = 20
-CEDICT_PATH = "cedict_1_0_ts_utf-8_mdbg.txt"  # Path to CC-CEDICT dictionary file
+CEDICT_PATH = "definitions.txt"  # Path to CC-CEDICT dictionary file
 
 # Initialize pkuseg segmenter (only once for efficiency)
 # pkuseg provides superior accuracy (96.88% F1 on MSRA) from Peking University
