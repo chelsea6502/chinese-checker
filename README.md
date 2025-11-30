@@ -4,7 +4,7 @@ Analyze Chinese text from your clipboard to gauge comprehension based on your kn
 
 ## Features
 - Clipboard text analysis with comprehension percentage
-- pkuseg word segmentation (96.88% F1 accuracy)
+- pkuseg word segmentation (~97% accuracy)
 - Automatic proper noun detection (excludes names/places)
 - Unknown words listed with pinyin, frequency, and definitions
 - Optional `unknown.txt` to exclude compound words
