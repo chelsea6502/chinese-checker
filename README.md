@@ -33,6 +33,7 @@ chmod +x run.sh
 git clone https://github.com/chelsea6502/chinese-checker.git
 cd chinese-checker
 pip install -r requirements.txt
+python3 script.py
 ```
 
 Models (pkuseg + spaCy zh_core_web_sm) download automatically on first run.
