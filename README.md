@@ -37,15 +37,11 @@ pip install -r requirements.txt
 1. Copy Chinese text to your clipboard
 2. Run the script:
 ```bash
-python comprehension.py
+python script.py
 ```
 
 ### Custom Known Words File
-By default, the script looks for `known.txt` in the same directory. To use a different file:
-```bash
-python comprehension.py
-```
-Then modify the `DEFAULT_KNOWN_WORDS_PATH` constant in the script.
+By default, the script looks for `known.txt` in the same directory. To use a different file, modify the `DEFAULT_KNOWN_WORDS_PATH` constant in the script.
 
 ### Known Words File Format
 Create a `known.txt` file with one word per line:
