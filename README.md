@@ -23,7 +23,7 @@ Download Python 3.9 or above from [python.org](https://www.python.org/downloads/
 
 ### Step 2: Clone or Download
 ```bash
-git clone https://github.com/YOUR_USERNAME/chinese-comprehension.git
+git clone https://github.com/chelsea6502/chinese-comprehension.git
 cd chinese-comprehension
 ```
 
@@ -53,12 +53,6 @@ Create a `known.txt` file with one word per line:
 五
 ```
 
-You can export your known words from:
-- Anki
-- Pleco
-- HSK word lists
-- [HelloChinese word list](https://docs.google.com/spreadsheets/d/1PppWybtv_ch5QMqtWlU4kAm08uFuhYK-6HGVnGeT63Y/edit#gid=121546596)
-
 ### Unknown Words File (Optional)
 Create an optional `unknown.txt` file to list compound words that should NOT be counted as known, even if all their individual characters are known. This prevents false positives where compound words are incorrectly counted as known.
 
@@ -72,17 +66,6 @@ Format (one word per line, comments with # are optional):
 **Why use this?** If you know the characters 好 and 吃 individually, the script would normally count 好吃 as "known". But if you haven't learned 好吃 as a compound word, add it to `unknown.txt` to exclude it from your comprehension calculation.
 
 **Note:** If a word appears in both `known.txt` and `unknown.txt`, it will be treated as known (explicit entries in `known.txt` take priority).
-
-## How It Works
-
-1. **Load Known Words**: Reads your known words from `known.txt` and expands to include individual characters
-2. **Get Clipboard Text**: Retrieves Chinese text from your clipboard
-3. **Clean Text**: Removes whitespace and diacritics
-4. **Tokenize**: Uses dynamic programming to find optimal word segmentation, maximizing known word coverage
-5. **Filter**: Removes punctuation, numbers, and English content
-6. **Load Unknown Words**: Optionally loads `unknown.txt` to exclude specific compound words from being counted as known
-7. **Analyze**: Calculates comprehension statistics
-8. **Display Results**: Shows word count, comprehension percentage, and unknown words with pinyin
 
 ## Example Output
 
@@ -99,16 +82,6 @@ Unique Unknown Words: 23
 與 (yǔ) : 5 - and, with, to give
 ...
 ```
-
-**Note:** Word definitions are automatically fetched from the MDBG Chinese-English dictionary API for the top 10 most frequent unknown words only (configurable via `MAX_DEFINITION_LOOKUPS` constant). If a definition cannot be found or the API is unavailable, only the word and pinyin will be displayed. Each API lookup has a 2-second timeout.
-
-## Algorithm Details
-
-The script uses a dynamic programming algorithm for word segmentation that:
-- Maximizes coverage of known words
-- Prefers longer known words over shorter ones
-- Falls back to jieba segmentation for unknown sequences
-- Handles up to 4-character words efficiently
 
 ## License
 
