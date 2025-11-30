@@ -10,14 +10,15 @@ import pyperclip
 import unicodedata
 from collections import Counter, namedtuple
 from pypinyin import pinyin, Style
-from typing import List, Set
+from typing import List, Set, Dict
+import os
 
 # Constants
 MAX_WORD_LENGTH = 4
 DEFAULT_KNOWN_WORDS_PATH = "known.txt"
 UNKNOWN_WORDS_PATH = "unknown.txt"
-MAX_UNKNOWN_WORDS_DISPLAY = 50
-MAX_DEFINITION_LOOKUPS = 10  # Only fetch definitions for top N words to avoid delays
+MAX_UNKNOWN_WORDS_DISPLAY = 20
+CEDICT_PATH = "cedict_1_0_ts_utf-8_mdbg.txt"  # Path to CC-CEDICT dictionary file
 
 # Comprehensive punctuation set
 PUNCTUATION_CHARS = set(
@@ -25,21 +26,72 @@ PUNCTUATION_CHARS = set(
     '｟｠｢｣､、〃《》「」『』【】〔〕〖〗〘〙〚〛〜〝〞〟〰〾〿–—''‛""„‟…‧﹏.?;﹔|.-·-*─\'\'\"\""'
 )
 
+# Characters to exclude from known words (special symbols that shouldn't be counted)
+EXCLUDED_CHARS = {'✓', '"', '"'}
+
 # Named tuple for DP state
 DPState = namedtuple('DPState', ['score', 'segmentation', 'unknown_start'])
+
+
+def load_cedict(path: str) -> Dict[str, str]:
+    """Load CC-CEDICT dictionary into memory for instant lookups.
+    
+    Returns a dictionary mapping Chinese words to their English definitions.
+    """
+    cedict = {}
+    if not os.path.exists(path):
+        return cedict
+    
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            for line in f:
+                line = line.strip()
+                # Skip comments and empty lines
+                if not line or line.startswith('#'):
+                    continue
+                
+                # Parse CC-CEDICT format: 傳統 传统 [chuan2 tong3] /traditional/
+                try:
+                    # Split on first space to separate traditional/simplified from rest
+                    parts = line.split(' ', 2)
+                    if len(parts) < 3:
+                        continue
+                    
+                    traditional = parts[0]
+                    simplified = parts[1]
+                    rest = parts[2]
+                    
+                    # Extract definition (between / characters)
+                    if '/' in rest:
+                        defs_start = rest.find('/')
+                        defs_end = rest.rfind('/')
+                        if defs_start < defs_end:
+                            definitions = rest[defs_start+1:defs_end]
+                            # Take first definition if multiple
+                            first_def = definitions.split('/')[0]
+                            # Store both traditional and simplified
+                            cedict[simplified] = first_def
+                            if traditional != simplified:
+                                cedict[traditional] = first_def
+                except Exception:
+                    continue
+    except Exception:
+        pass
+    
+    return cedict
 
 
 def comprehension_checker(known_words_path: str = DEFAULT_KNOWN_WORDS_PATH) -> str:
     """Check comprehension of Chinese text from clipboard against known words."""
     try:
-        # Initialize CC-CEDICT parser for definitions
-        # Note: cedict-utils doesn't include dictionary data by default
-        # We'll use a simpler approach with a dictionary API or skip definitions
-        cedict = None
+        # Load CC-CEDICT dictionary for instant offline lookups
+        cedict = load_cedict(CEDICT_PATH)
         
         # Load known words (no character expansion)
         with open(known_words_path, encoding="utf8") as f:
             base_words = set(f.read().split())
+        # Filter out excluded characters
+        base_words = {word for word in base_words if word not in EXCLUDED_CHARS}
         known_words = base_words.copy()
         
         # Load unknown words to exclude from known word counting
@@ -186,33 +238,13 @@ def comprehension_checker(known_words_path: str = DEFAULT_KNOWN_WORDS_PATH) -> s
             for idx, (word, count) in enumerate(unknown_words[:display_count]):
                 word_pinyin = ' '.join(p[0] for p in pinyin(word, style=Style.TONE))
                 
-                # Only look up definitions for top N words to avoid delays
+                # Fast offline definition lookup from CC-CEDICT
                 definition = ""
-                if idx < MAX_DEFINITION_LOOKUPS:
-                    try:
-                        import urllib.request
-                        import urllib.parse
-                        import re
-                        
-                        # Use MDBG's simple API
-                        encoded_word = urllib.parse.quote(word)
-                        url = f"https://www.mdbg.net/chinese/dictionary?page=worddict&wdrst=1&wdqb={encoded_word}"
-                        
-                        # Simple scraping approach - look for English definition
-                        with urllib.request.urlopen(url, timeout=2) as response:
-                            html = response.read().decode('utf-8')
-                            # Look for definition pattern in HTML
-                            if '<div class="defs">' in html:
-                                start = html.find('<div class="defs">') + len('<div class="defs">')
-                                end = html.find('</div>', start)
-                                if end > start:
-                                    def_text = html[start:end].strip()
-                                    # Clean HTML tags
-                                    def_text = re.sub('<[^<]+?>', '', def_text)
-                                    if def_text and len(def_text) < 100:
-                                        definition = f" - {def_text[:80]}"
-                    except Exception:
-                        pass  # If API fails, just skip definition
+                if cedict and word in cedict:
+                    meaning = cedict[word]
+                    if len(meaning) > 80:
+                        meaning = meaning[:77] + "..."
+                    definition = f" - {meaning}"
                 
                 lines.append(f"{word} ({word_pinyin}) : {count}{definition}")
             
