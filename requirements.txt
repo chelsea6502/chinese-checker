@@ -1,3 +1,3 @@
-stanza==1.8.2
+spacy-pkuseg==0.0.32
 pyperclip==1.8.2
 pypinyin==0.52.0

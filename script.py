@@ -5,7 +5,7 @@ Analyzes Chinese text from clipboard to calculate comprehension based on known w
 Uses dynamic programming for optimal word segmentation.
 """
 
-import stanza
+import spacy_pkuseg as pkuseg
 import pyperclip
 import unicodedata
 from collections import Counter, namedtuple
@@ -32,27 +32,21 @@ UNKNOWN_WORDS_PATH = "unknown.txt"
 MAX_UNKNOWN_WORDS_DISPLAY = 20
 CEDICT_PATH = "cedict_1_0_ts_utf-8_mdbg.txt"  # Path to CC-CEDICT dictionary file
 
-# Initialize Stanza segmenter (only once for efficiency)
-# Stanza provides state-of-the-art accuracy (97-98%) from Stanford NLP
-# This will download the model on first run (~200MB)
-stanza_nlp = None
+# Initialize pkuseg segmenter (only once for efficiency)
+# pkuseg provides superior accuracy (96.88% F1 on MSRA) from Peking University
+# Uses pre-trained models optimized for web/news/mixed domains
+pkuseg_segmenter = None
 
-def get_stanza_segmenter():
-    """Lazy load Stanza segmenter to avoid slow startup"""
-    global stanza_nlp
-    if stanza_nlp is None:
-        logger.info("Initializing Stanza segmenter (downloading model if needed)...")
-        # Download Chinese model if not present, then initialize
-        stanza.download('zh', verbose=False)
-        stanza_nlp = stanza.Pipeline(
-            'zh',
-            processors='tokenize',
-            verbose=False,
-            download_method=None,
-            logging_level='ERROR'  # Suppress INFO/WARNING logs from Stanza
-        )
-        logger.info("Stanza initialized")
-    return stanza_nlp
+def get_pkuseg_segmenter():
+    """Lazy load pkuseg segmenter to avoid slow startup"""
+    global pkuseg_segmenter
+    if pkuseg_segmenter is None:
+        logger.info("Initializing pkuseg segmenter (loading model)...")
+        # Use 'mixed' model for best general-purpose accuracy
+        # Other options: 'news', 'web', 'medicine', 'tourism'
+        pkuseg_segmenter = pkuseg.pkuseg(model_name='mixed')
+        logger.info("pkuseg initialized")
+    return pkuseg_segmenter
 
 # Comprehensive punctuation set
 PUNCTUATION_CHARS = set(
@@ -161,10 +155,10 @@ def comprehension_checker(known_words_path: str = DEFAULT_KNOWN_WORDS_PATH) -> s
         
         # Helper function to segment unknown text
         def segment_unknown(text: str) -> List[str]:
-            """Segment unknown text by first checking unknown.txt, then using Stanza"""
+            """Segment unknown text by first checking unknown.txt, then using pkuseg"""
             result = []
             i = 0
-            segmenter = get_stanza_segmenter()
+            segmenter = get_pkuseg_segmenter()
             
             while i < len(text):
                 # Try to match against unknown_words_list (longest match first)
@@ -178,7 +172,7 @@ def comprehension_checker(known_words_path: str = DEFAULT_KNOWN_WORDS_PATH) -> s
                         break
                 
                 if not matched:
-                    # If no match in unknown.txt, use Stanza for this segment
+                    # If no match in unknown.txt, use pkuseg for this segment
                     # Find the next unknown word boundary or end of text
                     j = i + 1
                     while j < len(text):
@@ -191,11 +185,9 @@ def comprehension_checker(known_words_path: str = DEFAULT_KNOWN_WORDS_PATH) -> s
                             break
                         j += 1
                     
-                    # Use Stanza on this segment
-                    # Stanza returns a Document with sentences containing tokens
-                    doc = segmenter(text[i:j])
-                    for sentence in doc.sentences:
-                        result.extend([token.text for token in sentence.tokens])
+                    # Use pkuseg on this segment
+                    # pkuseg.cut() returns a list of word strings
+                    result.extend(segmenter.cut(text[i:j]))
                     i = j
             
             return result
