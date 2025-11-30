@@ -10,9 +10,24 @@ ENV/
 env/
 /books
 /data/*.txt
+!input/example.txt
 output.txt
 mega_book.py
 
 # User's personal word lists
+# Exception: Keep HSK files and example.txt
+!known/HSK1.txt
+!known/HSK2.txt
+!known/HSK3.txt
+!known/HSK4.txt
+!unknown/HSK5.txt
+!unknown/HSK6.txt
+!unknown/HSKBand1.txt
+!unknown/HSKBand2.txt
+!unknown/HSKBand3.txt
+!unknown/HSKBand4.txt
+!unknown/HSKBand5.txt
+!unknown/HSKBand6.txt
+# Ignore other txt files
 known/*.txt
 unknown/*.txt
