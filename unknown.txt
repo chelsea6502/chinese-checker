@@ -1,0 +1,20 @@
+# Unknown words from last analysis
+# Excludes: single characters and compound words made of known characters
+# Total: 16 words
+
+宝贝	# bǎo bèi (frequency: 6)
+嘟嘟	# dū dū (frequency: 4)
+孤独	# gū dú (frequency: 3)
+宝宝	# bǎo bǎo (frequency: 2)
+曲棍	# qū gùn (frequency: 1)
+伦敦	# lún dūn (frequency: 1)
+吹灭	# chuī miè (frequency: 1)
+蜡烛	# là zhú (frequency: 1)
+欣赏	# xīn shǎng (frequency: 1)
+王塞	# wáng sāi (frequency: 1)
+灰尘	# huī chén (frequency: 1)
+呜呜	# wū wū (frequency: 1)
+哎哟	# āi yō (frequency: 1)
+咕咕	# gū gū (frequency: 1)
+嘎嘎	# gā gā (frequency: 1)
+臭臭	# chòu chòu (frequency: 1)
