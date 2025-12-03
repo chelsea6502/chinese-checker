@@ -5,14 +5,17 @@ A web interface for analyzing Chinese text comprehension based on known words.
 """
 
 import streamlit as st
-import tempfile
 import os
-from script import KNOWN_WORDS_DIR, UNKNOWN_WORDS_DIR, MAX_WORD_LENGTH, PUNCTUATION_CHARS, DPState
-from script import load_cedict, get_pkuseg_segmenter, get_spacy_nlp, CEDICT_PATH, MAX_UNKNOWN_WORDS_DISPLAY
 import unicodedata
 from collections import Counter
 from pypinyin import pinyin, Style
-from typing import List, Set
+from typing import List
+
+from script import (
+    KNOWN_WORDS_DIR, UNKNOWN_WORDS_DIR, MAX_WORD_LENGTH, 
+    PUNCTUATION_CHARS, DPState, load_cedict, get_pkuseg_segmenter, 
+    get_spacy_nlp, CEDICT_PATH, MAX_UNKNOWN_WORDS_DISPLAY
+)
 
 # Page configuration
 st.set_page_config(
@@ -22,7 +25,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better styling
+# Custom CSS
 st.markdown("""
 <style>
     .main-header {
@@ -47,6 +50,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+
 def load_word_list_from_file(filepath: str) -> List[str]:
     """Load words from a single file."""
     words = []
@@ -60,56 +64,46 @@ def load_word_list_from_file(filepath: str) -> List[str]:
                         words.append(word)
     return words
 
+
 def get_available_wordlists(directory: str) -> List[str]:
-    """Get list of available HSK word list files."""
+    """Get list of available HSK word list files in order."""
     if not os.path.exists(directory):
         return []
+    
     files = [f for f in os.listdir(directory) if f.endswith('.txt')]
-    # Sort HSK files in order
-    hsk_order = ['HSK1.txt', 'HSK2.txt', 'HSK3.txt', 'HSK4.txt', 'HSK5.txt', 'HSK6.txt',
-                 'HSKBand1.txt', 'HSKBand2.txt', 'HSKBand3.txt', 'HSKBand4.txt',
-                 'HSKBand5.txt', 'HSKBand6.txt', 'HSKBand7-9.txt']
-    sorted_files = []
-    other_files = []
+    hsk_order = [
+        'HSK1.txt', 'HSK2.txt', 'HSK3.txt', 'HSK4.txt', 'HSK5.txt', 'HSK6.txt',
+        'HSKBand1.txt', 'HSKBand2.txt', 'HSKBand3.txt', 'HSKBand4.txt',
+        'HSKBand5.txt', 'HSKBand6.txt', 'HSKBand7-9.txt'
+    ]
     
-    for hsk_file in hsk_order:
-        if hsk_file in files:
-            sorted_files.append(hsk_file)
-    
-    # Add any other files not in the HSK list (like custom.txt) at the end
-    for f in sorted(files):
-        if f not in sorted_files:
-            other_files.append(f)
-    
-    return sorted_files + other_files
+    return [f for f in hsk_order if f in files]
 
-def comprehension_checker_with_selection(text: str, selected_known: List[str], selected_unknown: List[str], all_files: List[tuple], custom_words: str = "") -> str:
-    """Check comprehension with selected word lists and custom words."""
+
+def analyze_text(text: str, selected_known: List[str], selected_unknown: List[str], 
+                 all_files: List[tuple], custom_words: str = "") -> str:
+    """Analyze Chinese text comprehension with selected word lists and custom words."""
     try:
-        # Load CC-CEDICT dictionary
         cedict = load_cedict(CEDICT_PATH)
         
-        # Load selected known words
+        # Load known words from selected files
         base_words = set()
         for filename in selected_known:
-            # Find the file in all_files to get its directory
             for fname, directory in all_files:
                 if fname == filename:
                     filepath = os.path.join(directory, filename)
                     base_words.update(load_word_list_from_file(filepath))
                     break
         
-        # Add custom words
+        # Add custom words (always treated as known)
         if custom_words:
-            custom_word_list = [w.strip() for w in custom_words.split('\n') if w.strip()]
-            base_words.update(custom_word_list)
+            base_words.update([w.strip() for w in custom_words.split('\n') if w.strip()])
         
         known_words = base_words.copy()
         
-        # Load selected unknown words
+        # Load unknown words from unselected files
         unknown_words_list = set()
         for filename in selected_unknown:
-            # Find the file in all_files to get its directory
             for fname, directory in all_files:
                 if fname == filename:
                     filepath = os.path.join(directory, filename)
@@ -119,7 +113,7 @@ def comprehension_checker_with_selection(text: str, selected_known: List[str], s
         if not text:
             raise ValueError("No text provided")
         
-        # Clean up text
+        # Clean text
         normalized = unicodedata.normalize("NFKD", "".join(text.split()))
         cleaned = "".join(c for c in normalized if unicodedata.category(c) != "Mn")
         
@@ -217,23 +211,18 @@ def comprehension_checker_with_selection(text: str, selected_known: List[str], s
         if not words:
             return "Error: No Chinese text found after filtering"
         
-        # Calculate stats
+        # Calculate statistics
         word_counts = Counter(words)
-        
-        def is_known(w):
-            if w in base_words:
-                return True
-            return False
-        
         total_words = len(words)
         unique_words = len(word_counts)
-        known_count = sum(count for word, count in word_counts.items() if is_known(word))
+        known_count = sum(count for word, count in word_counts.items() if word in base_words)
         unknown_words = sorted(
-            [(w, c) for w, c in word_counts.items() if not is_known(w)],
+            [(w, c) for w, c in word_counts.items() if w not in base_words],
             key=lambda x: x[1], reverse=True
         )
         comprehension_pct = known_count / total_words * 100
         
+        # Assessment
         def get_assessment(pct: float) -> str:
             if pct < 82:
                 return "⛔ Too Difficult"
@@ -262,16 +251,14 @@ def comprehension_checker_with_selection(text: str, selected_known: List[str], s
             lines.append("\n=== Unknown Words (by frequency) ===")
             display_count = min(len(unknown_words), MAX_UNKNOWN_WORDS_DISPLAY)
             
-            for idx, (word, count) in enumerate(unknown_words[:display_count]):
+            for word, count in unknown_words[:display_count]:
                 word_pinyin = ' '.join(p[0] for p in pinyin(word, style=Style.TONE))
-                
                 definition = ""
                 if cedict and word in cedict:
                     meaning = cedict[word]
                     if len(meaning) > 80:
                         meaning = meaning[:77] + "..."
                     definition = f" - {meaning}"
-                
                 lines.append(f"{word} ({word_pinyin}) : {count}{definition}")
             
             if len(unknown_words) > display_count:
@@ -282,60 +269,48 @@ def comprehension_checker_with_selection(text: str, selected_known: List[str], s
     except Exception as e:
         return f"Error: An unexpected error occurred: {str(e)}"
 
+
 def main():
     # Header
     st.markdown('<div class="main-header">📚 Chinese Checker</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Analyze Chinese text comprehension based on your known words</div>', unsafe_allow_html=True)
     
-    # Get all word lists from both directories (needed for analysis)
+    # Get word lists
     known_files = get_available_wordlists(KNOWN_WORDS_DIR)
     unknown_files = get_available_wordlists(UNKNOWN_WORDS_DIR)
     
-    # Define HSK order
-    hsk_order = ['HSK1.txt', 'HSK2.txt', 'HSK3.txt', 'HSK4.txt', 'HSK5.txt', 'HSK6.txt',
-                 'HSKBand1.txt', 'HSKBand2.txt', 'HSKBand3.txt', 'HSKBand4.txt',
-                 'HSKBand5.txt', 'HSKBand6.txt', 'HSKBand7-9.txt']
+    hsk_order = [
+        'HSK1.txt', 'HSK2.txt', 'HSK3.txt', 'HSK4.txt', 'HSK5.txt', 'HSK6.txt',
+        'HSKBand1.txt', 'HSKBand2.txt', 'HSKBand3.txt', 'HSKBand4.txt',
+        'HSKBand5.txt', 'HSKBand6.txt', 'HSKBand7-9.txt'
+    ]
     
     all_files = []
-    custom_files = []
-    
-    # Add HSK files in order from both directories
     for hsk_file in hsk_order:
         if hsk_file in known_files:
             all_files.append((hsk_file, KNOWN_WORDS_DIR))
         elif hsk_file in unknown_files:
             all_files.append((hsk_file, UNKNOWN_WORDS_DIR))
     
-    # Don't include custom.txt files in the sidebar
-    # Users will add custom words via the Custom Words tab
-    
-    # Sidebar for word list selection
+    # Sidebar
     with st.sidebar:
         st.header("📚 HSK Word Lists")
         
-        # Initialize session state with known files checked by default
         if 'selected_wordlists' not in st.session_state:
             st.session_state.selected_wordlists = set(known_files)
         
-        # Separate HSK 2.0 and HSK 3.0 files
-        hsk_2_files = []
-        hsk_3_files = []
+        # Separate HSK 2.0 and 3.0
+        hsk_2_files = [(f, d) for f, d in all_files if 'HSKBand' not in f]
+        hsk_3_files = [(f, d) for f, d in all_files if 'HSKBand' in f]
         
-        for filename, directory in all_files:
-            if 'HSKBand' in filename:
-                hsk_3_files.append((filename, directory))
-            else:
-                hsk_2_files.append((filename, directory))
-        
-        # Display HSK 2.0 section
+        # HSK 2.0 section
         if hsk_2_files:
             st.markdown("### HSK 2.0")
             for filename, directory in hsk_2_files:
                 filepath = os.path.join(directory, filename)
                 word_count = len(load_word_list_from_file(filepath))
+                label = f"{filename.replace('.txt', '')} ({word_count:,} words)"
                 
-                display_name = filename.replace('.txt', '')
-                label = f"{display_name} ({word_count:,} words)"
                 checked = st.checkbox(
                     label,
                     value=filename in st.session_state.selected_wordlists,
@@ -347,15 +322,15 @@ def main():
                 else:
                     st.session_state.selected_wordlists.discard(filename)
         
-        # Display HSK 3.0 section
+        # HSK 3.0 section
         if hsk_3_files:
             st.markdown("### HSK 3.0")
             for filename, directory in hsk_3_files:
                 filepath = os.path.join(directory, filename)
                 word_count = len(load_word_list_from_file(filepath))
-                
                 display_name = filename.replace('.txt', '').replace('HSKBand', 'Band ')
                 label = f"{display_name} ({word_count:,} words)"
+                
                 checked = st.checkbox(
                     label,
                     value=filename in st.session_state.selected_wordlists,
@@ -366,9 +341,8 @@ def main():
                     st.session_state.selected_wordlists.add(filename)
                 else:
                     st.session_state.selected_wordlists.discard(filename)
-        
     
-    # Main content area with tabs
+    # Main content tabs
     tab1, tab2 = st.tabs(["📝 Analyze Text", "✏️ Custom Words"])
     
     with tab1:
@@ -382,33 +356,18 @@ def main():
         
         col1, col2, col3 = st.columns([1, 1, 2])
         with col1:
-            analyze_button = st.button("🔍 Analyze Text", type="primary", use_container_width=True, key="analyze_text")
+            analyze_button = st.button("🔍 Analyze Text", type="primary", use_container_width=True)
         with col2:
-            if st.button("🗑️ Clear", use_container_width=True, key="clear_text"):
+            if st.button("🗑️ Clear", use_container_width=True):
                 st.rerun()
         
         if analyze_button and text_input.strip():
             with st.spinner("Analyzing text..."):
-                # Separate checked (known) and unchecked (unknown) lists
-                selected_known = []
-                selected_unknown = []
-                
-                for filename, directory in all_files:
-                    if filename in st.session_state.selected_wordlists:
-                        selected_known.append(filename)
-                    else:
-                        selected_unknown.append(filename)
-                
-                # Get custom words from session state
+                selected_known = [f for f, _ in all_files if f in st.session_state.selected_wordlists]
+                selected_unknown = [f for f, _ in all_files if f not in st.session_state.selected_wordlists]
                 custom_words = st.session_state.get('custom_words', '')
                 
-                result = comprehension_checker_with_selection(
-                    text_input,
-                    selected_known,
-                    selected_unknown,
-                    all_files,
-                    custom_words
-                )
+                result = analyze_text(text_input, selected_known, selected_unknown, all_files, custom_words)
                 
                 st.markdown("### 📊 Analysis Results")
                 st.markdown('<div class="result-box">', unsafe_allow_html=True)
@@ -421,7 +380,6 @@ def main():
         st.markdown("### Add Your Custom Words")
         st.markdown("Enter words you know (one per line):")
         
-        # Initialize custom words in session state
         if 'custom_words' not in st.session_state:
             st.session_state.custom_words = ''
         
@@ -436,19 +394,17 @@ def main():
         
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("💾 Save Custom Words", use_container_width=True, key="save_custom"):
+            if st.button("💾 Save Custom Words", use_container_width=True):
                 st.session_state.custom_words = custom_input
                 word_count = len([w for w in custom_input.split('\n') if w.strip()])
                 st.success(f"✅ Saved {word_count} custom words!")
         with col2:
-            if st.button("🗑️ Clear Custom Words", use_container_width=True, key="clear_custom"):
+            if st.button("🗑️ Clear Custom Words", use_container_width=True):
                 st.session_state.custom_words = ''
                 st.rerun()
-    
+
 
 if __name__ == "__main__":
-    # Ensure directories exist
     os.makedirs(KNOWN_WORDS_DIR, exist_ok=True)
     os.makedirs(UNKNOWN_WORDS_DIR, exist_ok=True)
-    
     main()
