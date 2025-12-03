@@ -34,3 +34,6 @@ mega_book.py
 # Ignore other txt files
 known/*.txt
 unknown/*.txt
+
+# Streamlit
+.streamlit/secrets.toml
