@@ -83,8 +83,8 @@ def get_available_wordlists(directory: str) -> List[str]:
     
     return sorted_files + other_files
 
-def comprehension_checker_with_selection(text: str, selected_known: List[str], selected_unknown: List[str], all_files: List[tuple]) -> str:
-    """Check comprehension with selected word lists."""
+def comprehension_checker_with_selection(text: str, selected_known: List[str], selected_unknown: List[str], all_files: List[tuple], custom_words: str = "") -> str:
+    """Check comprehension with selected word lists and custom words."""
     try:
         # Load CC-CEDICT dictionary
         cedict = load_cedict(CEDICT_PATH)
@@ -98,6 +98,11 @@ def comprehension_checker_with_selection(text: str, selected_known: List[str], s
                     filepath = os.path.join(directory, filename)
                     base_words.update(load_word_list_from_file(filepath))
                     break
+        
+        # Add custom words
+        if custom_words:
+            custom_word_list = [w.strip() for w in custom_words.split('\n') if w.strip()]
+            base_words.update(custom_word_list)
         
         known_words = base_words.copy()
         
@@ -301,16 +306,8 @@ def main():
         elif hsk_file in unknown_files:
             all_files.append((hsk_file, UNKNOWN_WORDS_DIR))
     
-    # Collect custom files (non-HSK files)
-    for f in known_files:
-        if f not in hsk_order:
-            custom_files.append((f, KNOWN_WORDS_DIR))
-    for f in unknown_files:
-        if f not in hsk_order:
-            custom_files.append((f, UNKNOWN_WORDS_DIR))
-    
-    # Add custom files at the end
-    all_files.extend(custom_files)
+    # Don't include custom.txt files in the sidebar
+    # Users will add custom words via the Custom Words tab
     
     # Sidebar for word list selection
     with st.sidebar:
@@ -345,47 +342,82 @@ def main():
                 st.session_state.selected_wordlists.discard(filename)
         
     
-    # Main content area
-    st.markdown("### 📝 Paste Chinese Text to Analyze")
-    text_input = st.text_area(
-        "Enter Chinese text to analyze:",
-        height=300,
-        placeholder="粘贴中文文本在这里...",
-        label_visibility="collapsed"
-    )
+    # Main content area with tabs
+    tab1, tab2 = st.tabs(["📝 Analyze Text", "✏️ Custom Words"])
     
-    col1, col2, col3 = st.columns([1, 1, 2])
-    with col1:
-        analyze_button = st.button("🔍 Analyze Text", type="primary", use_container_width=True, key="analyze_text")
-    with col2:
-        if st.button("🗑️ Clear", use_container_width=True, key="clear_text"):
-            st.rerun()
+    with tab1:
+        st.markdown("### Paste Chinese Text to Analyze")
+        text_input = st.text_area(
+            "Enter Chinese text to analyze:",
+            height=300,
+            placeholder="粘贴中文文本在这里...",
+            label_visibility="collapsed"
+        )
+        
+        col1, col2, col3 = st.columns([1, 1, 2])
+        with col1:
+            analyze_button = st.button("🔍 Analyze Text", type="primary", use_container_width=True, key="analyze_text")
+        with col2:
+            if st.button("🗑️ Clear", use_container_width=True, key="clear_text"):
+                st.rerun()
+        
+        if analyze_button and text_input.strip():
+            with st.spinner("Analyzing text..."):
+                # Separate checked (known) and unchecked (unknown) lists
+                selected_known = []
+                selected_unknown = []
+                
+                for filename, directory in all_files:
+                    if filename in st.session_state.selected_wordlists:
+                        selected_known.append(filename)
+                    else:
+                        selected_unknown.append(filename)
+                
+                # Get custom words from session state
+                custom_words = st.session_state.get('custom_words', '')
+                
+                result = comprehension_checker_with_selection(
+                    text_input,
+                    selected_known,
+                    selected_unknown,
+                    all_files,
+                    custom_words
+                )
+                
+                st.markdown("### 📊 Analysis Results")
+                st.markdown('<div class="result-box">', unsafe_allow_html=True)
+                st.code(result, language=None)
+                st.markdown('</div>', unsafe_allow_html=True)
+        elif analyze_button:
+            st.warning("⚠️ Please enter some Chinese text to analyze.")
     
-    if analyze_button and text_input.strip():
-        with st.spinner("Analyzing text..."):
-            # Separate checked (known) and unchecked (unknown) lists
-            selected_known = []
-            selected_unknown = []
-            
-            for filename, directory in all_files:
-                if filename in st.session_state.selected_wordlists:
-                    selected_known.append(filename)
-                else:
-                    selected_unknown.append(filename)
-            
-            result = comprehension_checker_with_selection(
-                text_input,
-                selected_known,
-                selected_unknown,
-                all_files
-            )
-            
-            st.markdown("### 📊 Analysis Results")
-            st.markdown('<div class="result-box">', unsafe_allow_html=True)
-            st.code(result, language=None)
-            st.markdown('</div>', unsafe_allow_html=True)
-    elif analyze_button:
-        st.warning("⚠️ Please enter some Chinese text to analyze.")
+    with tab2:
+        st.markdown("### Add Your Custom Words")
+        st.markdown("Enter words you know (one per line):")
+        
+        # Initialize custom words in session state
+        if 'custom_words' not in st.session_state:
+            st.session_state.custom_words = ''
+        
+        custom_input = st.text_area(
+            "Custom Words",
+            value=st.session_state.custom_words,
+            height=400,
+            placeholder="你好\n再见\n谢谢",
+            label_visibility="collapsed",
+            key="custom_words_input"
+        )
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("💾 Save Custom Words", use_container_width=True, key="save_custom"):
+                st.session_state.custom_words = custom_input
+                word_count = len([w for w in custom_input.split('\n') if w.strip()])
+                st.success(f"✅ Saved {word_count} custom words!")
+        with col2:
+            if st.button("🗑️ Clear Custom Words", use_container_width=True, key="clear_custom"):
+                st.session_state.custom_words = ''
+                st.rerun()
     
     # Footer
     st.markdown("---")
