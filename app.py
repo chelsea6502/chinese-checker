@@ -311,57 +311,66 @@ def main():
     
     # Sidebar
     with st.sidebar:
-        st.header("📚 HSK Word Lists")
+        st.header("📚 HSK Level")
         
-        # Initialize session state with persistence
-        if 'selected_wordlists' not in st.session_state:
-            st.session_state.selected_wordlists = set(known_files)
+        # HSK 2.0 levels
+        hsk_2_levels = ['None', 'HSK 1', 'HSK 2', 'HSK 3', 'HSK 4', 'HSK 5', 'HSK 6']
+        hsk_2_files_map = {
+            'HSK 1': ['HSK1.txt'],
+            'HSK 2': ['HSK1.txt', 'HSK2.txt'],
+            'HSK 3': ['HSK1.txt', 'HSK2.txt', 'HSK3.txt'],
+            'HSK 4': ['HSK1.txt', 'HSK2.txt', 'HSK3.txt', 'HSK4.txt'],
+            'HSK 5': ['HSK1.txt', 'HSK2.txt', 'HSK3.txt', 'HSK4.txt', 'HSK5.txt'],
+            'HSK 6': ['HSK1.txt', 'HSK2.txt', 'HSK3.txt', 'HSK4.txt', 'HSK5.txt', 'HSK6.txt'],
+        }
         
-        if 'settings_loaded' not in st.session_state:
-            st.session_state.settings_loaded = False
+        # Initialize session state
+        if 'hsk_2_level' not in st.session_state:
+            st.session_state.hsk_2_level = 'HSK 4'
+        if 'hsk_3_level' not in st.session_state:
+            st.session_state.hsk_3_level = 'None'
         
-        # Separate HSK 2.0 and 3.0
-        hsk_2_files = [(f, d) for f, d in all_files if 'HSKBand' not in f]
-        hsk_3_files = [(f, d) for f, d in all_files if 'HSKBand' in f]
+        st.markdown("### HSK 2.0")
+        hsk_2_selection = st.selectbox(
+            "Select your HSK 2.0 level (includes all previous levels):",
+            hsk_2_levels,
+            index=hsk_2_levels.index(st.session_state.hsk_2_level),
+            key="hsk_2_select",
+            label_visibility="collapsed"
+        )
+        st.session_state.hsk_2_level = hsk_2_selection
         
-        # HSK 2.0 section
-        if hsk_2_files:
-            st.markdown("### HSK 2.0")
-            for filename, directory in hsk_2_files:
-                filepath = os.path.join(directory, filename)
-                word_count = len(load_word_list_from_file(filepath))
-                label = f"{filename.replace('.txt', '')} ({word_count:,} words)"
-                
-                checked = st.checkbox(
-                    label,
-                    value=filename in st.session_state.selected_wordlists,
-                    key=f"wordlist_{filename}"
-                )
-                
-                if checked:
-                    st.session_state.selected_wordlists.add(filename)
-                else:
-                    st.session_state.selected_wordlists.discard(filename)
+        # HSK 3.0 levels (New HSK)
+        hsk_3_levels = ['None', 'Band 1', 'Band 2', 'Band 3', 'Band 4', 'Band 5', 'Band 6', 'Band 7-9']
+        hsk_3_files_map = {
+            'Band 1': ['HSKBand1.txt'],
+            'Band 2': ['HSKBand1.txt', 'HSKBand2.txt'],
+            'Band 3': ['HSKBand1.txt', 'HSKBand2.txt', 'HSKBand3.txt'],
+            'Band 4': ['HSKBand1.txt', 'HSKBand2.txt', 'HSKBand3.txt', 'HSKBand4.txt'],
+            'Band 5': ['HSKBand1.txt', 'HSKBand2.txt', 'HSKBand3.txt', 'HSKBand4.txt', 'HSKBand5.txt'],
+            'Band 6': ['HSKBand1.txt', 'HSKBand2.txt', 'HSKBand3.txt', 'HSKBand4.txt', 'HSKBand5.txt', 'HSKBand6.txt'],
+            'Band 7-9': ['HSKBand1.txt', 'HSKBand2.txt', 'HSKBand3.txt', 'HSKBand4.txt', 'HSKBand5.txt', 'HSKBand6.txt', 'HSKBand7-9.txt'],
+        }
         
-        # HSK 3.0 section
-        if hsk_3_files:
-            st.markdown("### HSK 3.0")
-            for filename, directory in hsk_3_files:
-                filepath = os.path.join(directory, filename)
-                word_count = len(load_word_list_from_file(filepath))
-                display_name = filename.replace('.txt', '').replace('HSKBand', 'Band ')
-                label = f"{display_name} ({word_count:,} words)"
-                
-                checked = st.checkbox(
-                    label,
-                    value=filename in st.session_state.selected_wordlists,
-                    key=f"wordlist_{filename}"
-                )
-                
-                if checked:
-                    st.session_state.selected_wordlists.add(filename)
-                else:
-                    st.session_state.selected_wordlists.discard(filename)
+        st.markdown("### HSK 3.0 (New HSK)")
+        hsk_3_selection = st.selectbox(
+            "Select your HSK 3.0 level (includes all previous bands):",
+            hsk_3_levels,
+            index=hsk_3_levels.index(st.session_state.hsk_3_level),
+            key="hsk_3_select",
+            label_visibility="collapsed"
+        )
+        st.session_state.hsk_3_level = hsk_3_selection
+        
+        # Build selected files list based on dropdown selections
+        selected_files = []
+        if hsk_2_selection != 'None':
+            selected_files.extend(hsk_2_files_map[hsk_2_selection])
+        if hsk_3_selection != 'None':
+            selected_files.extend(hsk_3_files_map[hsk_3_selection])
+        
+        # Update selected_wordlists for compatibility with analysis
+        st.session_state.selected_wordlists = set(selected_files)
     
     # Main content tabs
     tab1, tab2 = st.tabs(["📝 Analyze Text", "✏️ Custom Words"])
