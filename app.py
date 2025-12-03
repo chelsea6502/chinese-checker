@@ -294,8 +294,6 @@ def main():
     # Sidebar for word list selection
     with st.sidebar:
         st.header("📚 HSK Word Lists")
-        st.markdown("*Check the levels you know. Unchecked = Unknown*")
-        st.caption("HSK 3.0 = New HSK (2021)")
         
         # Initialize session state with known files checked by default
         if 'selected_wordlists' not in st.session_state:
