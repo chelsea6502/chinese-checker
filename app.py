@@ -342,103 +342,47 @@ def main():
         st.markdown("---")
         st.markdown("Built with ❤️ using [Streamlit](https://streamlit.io)")
     
-    # Main content area with tabs
-    tab1, tab2 = st.tabs(["📝 Analyze Text", "📁 Upload Files"])
+    # Main content area
+    st.markdown("### 📝 Paste Chinese Text to Analyze")
+    text_input = st.text_area(
+        "Enter Chinese text to analyze:",
+        height=300,
+        placeholder="粘贴中文文本在这里...",
+        label_visibility="collapsed"
+    )
     
-    with tab1:
-        st.markdown("### Paste Chinese Text")
-        text_input = st.text_area(
-            "Enter Chinese text to analyze:",
-            height=300,
-            placeholder="粘贴中文文本在这里...",
-            label_visibility="collapsed"
-        )
-        
-        col1, col2, col3 = st.columns([1, 1, 2])
-        with col1:
-            analyze_button = st.button("🔍 Analyze Text", type="primary", use_container_width=True, key="analyze_text")
-        with col2:
-            if st.button("🗑️ Clear", use_container_width=True, key="clear_text"):
-                st.rerun()
-        
-        if analyze_button and text_input.strip():
-            with st.spinner("Analyzing text..."):
-                # Separate checked (known) and unchecked (unknown) lists
-                selected_known = []
-                selected_unknown = []
-                
-                for filename, directory in all_files:
-                    if filename in st.session_state.selected_wordlists:
-                        selected_known.append(filename)
-                    else:
-                        selected_unknown.append(filename)
-                
-                result = comprehension_checker_with_selection(
-                    text_input,
-                    selected_known,
-                    selected_unknown,
-                    all_files
-                )
-                
-                st.markdown("### 📊 Analysis Results")
-                st.markdown('<div class="result-box">', unsafe_allow_html=True)
-                st.code(result, language=None)
-                st.markdown('</div>', unsafe_allow_html=True)
-        elif analyze_button:
-            st.warning("⚠️ Please enter some Chinese text to analyze.")
+    col1, col2, col3 = st.columns([1, 1, 2])
+    with col1:
+        analyze_button = st.button("🔍 Analyze Text", type="primary", use_container_width=True, key="analyze_text")
+    with col2:
+        if st.button("🗑️ Clear", use_container_width=True, key="clear_text"):
+            st.rerun()
     
-    with tab2:
-        st.markdown("### Upload Text Files")
-        uploaded_files = st.file_uploader(
-            "Choose .txt files containing Chinese text",
-            type=['txt'],
-            accept_multiple_files=True,
-            label_visibility="collapsed"
-        )
-        
-        if uploaded_files:
-            analyze_files = st.button("🔍 Analyze Files", type="primary", use_container_width=True, key="analyze_files")
+    if analyze_button and text_input.strip():
+        with st.spinner("Analyzing text..."):
+            # Separate checked (known) and unchecked (unknown) lists
+            selected_known = []
+            selected_unknown = []
             
-            if analyze_files:
-                for uploaded_file in uploaded_files:
-                    st.markdown(f"### 📄 {uploaded_file.name}")
-                    
-                    try:
-                        # Read file content
-                        text = uploaded_file.read().decode('utf-8')
-                        
-                        if not text.strip():
-                            st.warning(f"⚠️ File '{uploaded_file.name}' is empty.")
-                            continue
-                        
-                        with st.spinner(f"Analyzing {uploaded_file.name}..."):
-                            # Separate checked (known) and unchecked (unknown) lists
-                            selected_known = []
-                            selected_unknown = []
-                            
-                            for filename, directory in all_files:
-                                if filename in st.session_state.selected_wordlists:
-                                    selected_known.append(filename)
-                                else:
-                                    selected_unknown.append(filename)
-                            
-                            result = comprehension_checker_with_selection(
-                                text,
-                                selected_known,
-                                selected_unknown,
-                                all_files
-                            )
-                            
-                            st.markdown('<div class="result-box">', unsafe_allow_html=True)
-                            st.code(result, language=None)
-                            st.markdown('</div>', unsafe_allow_html=True)
-                    
-                    except Exception as e:
-                        st.error(f"❌ Error processing '{uploaded_file.name}': {str(e)}")
-                    
-                    st.divider()
-        else:
-            st.info("👆 Upload one or more .txt files to analyze")
+            for filename, directory in all_files:
+                if filename in st.session_state.selected_wordlists:
+                    selected_known.append(filename)
+                else:
+                    selected_unknown.append(filename)
+            
+            result = comprehension_checker_with_selection(
+                text_input,
+                selected_known,
+                selected_unknown,
+                all_files
+            )
+            
+            st.markdown("### 📊 Analysis Results")
+            st.markdown('<div class="result-box">', unsafe_allow_html=True)
+            st.code(result, language=None)
+            st.markdown('</div>', unsafe_allow_html=True)
+    elif analyze_button:
+        st.warning("⚠️ Please enter some Chinese text to analyze.")
     
     # Footer
     st.markdown("---")
