@@ -445,30 +445,6 @@ def main():
                 st.session_state.custom_words = ''
                 st.rerun()
     
-    # Footer
-    st.markdown("---")
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown("**Comprehension Levels:**")
-        st.markdown("""
-        - ⛔ <82%: Too Difficult
-        - 🔴 82-87%: Very Challenging
-        - 🟡 87-89%: Challenging
-        """)
-    with col2:
-        st.markdown("**Optimal Range:**")
-        st.markdown("""
-        - 🟢 89-92%: Optimal (i+1)
-        - 🔵 92-95%: Comfortable
-        - ⚪ >95%: Too Easy
-        """)
-    with col3:
-        st.markdown("**Tips:**")
-        st.markdown("""
-        - Add HSK words to Known Words
-        - Target 89-92% for best learning
-        - Proper nouns are auto-excluded
-        """)
 
 if __name__ == "__main__":
     # Ensure directories exist
