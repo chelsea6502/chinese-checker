@@ -70,14 +70,18 @@ def get_available_wordlists(directory: str) -> List[str]:
                  'HSKBand1.txt', 'HSKBand2.txt', 'HSKBand3.txt', 'HSKBand4.txt',
                  'HSKBand5.txt', 'HSKBand6.txt', 'HSKBand7-9.txt']
     sorted_files = []
+    other_files = []
+    
     for hsk_file in hsk_order:
         if hsk_file in files:
             sorted_files.append(hsk_file)
-    # Add any other files not in the HSK list
+    
+    # Add any other files not in the HSK list (like custom.txt) at the end
     for f in sorted(files):
         if f not in sorted_files:
-            sorted_files.append(f)
-    return sorted_files
+            other_files.append(f)
+    
+    return sorted_files + other_files
 
 def comprehension_checker_with_selection(text: str, selected_known: List[str], selected_unknown: List[str], all_files: List[tuple]) -> str:
     """Check comprehension with selected word lists."""
