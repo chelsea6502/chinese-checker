@@ -10,8 +10,8 @@ import re
 import sys
 from pathlib import Path
 
-CEDICT_PATH = Path(__file__).resolve().parents[2] / "definitions.txt"
-OUTPUT_PATH = Path(__file__).resolve().parent.parent / "static" / "dictionary.json"
+CEDICT_PATH = Path(__file__).resolve().parents[1] / "definitions.txt"
+OUTPUT_PATH = Path(__file__).resolve().parents[1] / "assets" / "dictionary.json"
 
 
 def parse_cedict(path: Path) -> dict[str, dict[str, str]]:

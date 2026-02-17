@@ -3,7 +3,7 @@
 
 import os
 
-KNOWN_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "known")
+KNOWN_DIR = os.path.join(os.path.dirname(__file__), "..", "known")
 OUTPUT_FILE = os.path.join(
     os.path.dirname(__file__), "..", "src", "chinese_checker", "hsk.gleam"
 )
