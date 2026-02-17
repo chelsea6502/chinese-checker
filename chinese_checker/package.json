@@ -1,0 +1,19 @@
+{
+  "name": "chinese_checker",
+  "version": "1.0.0",
+  "description": "[![Package Version](https://img.shields.io/hexpm/v/chinese_checker)](https://hex.pm/packages/chinese_checker) [![Hex Docs](https://img.shields.io/badge/hex-docs-ffaff3)](https://hexdocs.pm/chinese_checker/)",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "jieba-wasm": "^2.4.0"
+  }
+}
