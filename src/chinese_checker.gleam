@@ -96,10 +96,6 @@ fn decode_entry() -> decode.Decoder(DictEntry) {
   decode.success(DictEntry(pinyin:, definition:))
 }
 
-fn decode_dictionary() -> decode.Decoder(Dict(String, DictEntry)) {
-  decode.dict(decode.string, decode_entry())
-}
-
 @external(javascript, "./ffi.mjs", "getOrigin")
 fn get_origin() -> String
 
@@ -112,15 +108,14 @@ fn fetch_dictionary() -> Effect(Msg) {
         fetch.send(req)
         |> promise.try_await(fetch.read_text_body)
         |> promise.map(fn(resp_result) {
-          let result = case resp_result {
-            Error(_) -> Error("Failed to fetch dictionary")
-            Ok(response) ->
-              case json.parse(response.body, decode_dictionary()) {
-                Ok(d) -> Ok(d)
-                Error(_) -> Error("Failed to parse dictionary JSON")
-              }
-          }
-          dispatch(DictionaryLoaded(result))
+          dispatch(DictionaryLoaded(
+            resp_result
+            |> result.map_error(fn(_) { "Failed to fetch dictionary" })
+            |> result.try(fn(response) {
+              json.parse(response.body, decode.dict(decode.string, decode_entry()))
+              |> result.map_error(fn(_) { "Failed to parse dictionary JSON" })
+            }),
+          ))
         })
         Nil
       }
@@ -128,18 +123,12 @@ fn fetch_dictionary() -> Effect(Msg) {
   })
 }
 
-fn get_pinyin(dictionary: Dict(String, DictEntry), word: String) -> String {
-  dictionary
-  |> dict.get(word)
-  |> result.map(fn(e) { e.pinyin })
-  |> result.unwrap("")
-}
-
-fn get_definition(dictionary: Dict(String, DictEntry), word: String) -> String {
-  dictionary
-  |> dict.get(word)
-  |> result.map(fn(e) { e.definition })
-  |> result.unwrap("")
+fn get_entry_field(
+  dictionary: Dict(String, DictEntry),
+  word: String,
+  f: fn(DictEntry) -> String,
+) -> String {
+  dictionary |> dict.get(word) |> result.map(f) |> result.unwrap("")
 }
 
 // --- HSK ---
@@ -148,22 +137,16 @@ fn known_words_for_levels(
   old_level: Option(Int),
   new_level: Option(Int),
 ) -> Set(String) {
-  let old = case old_level {
-    None -> []
-    Some(1) -> [hsk.hsk1()]
-    Some(2) -> [hsk.hsk1(), hsk.hsk2()]
-    Some(3) -> [hsk.hsk1(), hsk.hsk2(), hsk.hsk3()]
-    Some(4) -> [hsk.hsk1(), hsk.hsk2(), hsk.hsk3(), hsk.hsk4()]
-    Some(5) -> [hsk.hsk1(), hsk.hsk2(), hsk.hsk3(), hsk.hsk4(), hsk.hsk5()]
-    Some(_) -> []
-  }
-  let new = case new_level {
-    None -> []
-    Some(1) -> [hsk.band1()]
-    Some(2) -> [hsk.band1(), hsk.band2()]
-    Some(3) -> [hsk.band1(), hsk.band2(), hsk.band3()]
-    Some(_) -> []
-  }
+  let all_old = [hsk.hsk1(), hsk.hsk2(), hsk.hsk3(), hsk.hsk4(), hsk.hsk5()]
+  let all_new = [hsk.band1(), hsk.band2(), hsk.band3()]
+  let old =
+    old_level
+    |> option.map(fn(n) { list.take(all_old, n) })
+    |> option.unwrap([])
+  let new =
+    new_level
+    |> option.map(fn(n) { list.take(all_new, n) })
+    |> option.unwrap([])
   list.fold(list.append(old, new), set.new(), set.union)
 }
 
@@ -173,14 +156,13 @@ const max_word_length = 4
 
 const max_unknown_display = 20
 
-fn is_cjk_char(cp: Int) -> Bool {
-  cp >= 0x4E00 && cp <= 0x9FFF
-}
-
 fn has_cjk(s: String) -> Bool {
   s
   |> string.to_utf_codepoints
-  |> list.any(fn(cp) { is_cjk_char(string.utf_codepoint_to_int(cp)) })
+  |> list.any(fn(cp) {
+    let v = string.utf_codepoint_to_int(cp)
+    v >= 0x4E00 && v <= 0x9FFF
+  })
 }
 
 fn is_ascii_alnum(cp: Int) -> Bool {
@@ -206,13 +188,10 @@ fn is_all_digits(s: String) -> Bool {
 
 fn is_valid_word(word: String) -> Bool {
   let trimmed = string.trim(word)
-  case trimmed {
-    "" -> False
-    _ ->
-      has_cjk(trimmed)
-      && !is_all_digits(trimmed)
-      && !has_ascii_alnum(trimmed)
-  }
+  !string.is_empty(trimmed)
+  && has_cjk(trimmed)
+  && !is_all_digits(trimmed)
+  && !has_ascii_alnum(trimmed)
 }
 
 fn remove_whitespace(text: String) -> String {
@@ -228,8 +207,7 @@ fn remove_whitespace(text: String) -> String {
     && v != 0xA0
     && v != 0x200B
   })
-  |> list.map(fn(cp) { string.from_utf_codepoints([cp]) })
-  |> string.concat
+  |> string.from_utf_codepoints
 }
 
 fn substr(graphemes: List(String), start: Int, end: Int) -> String {
@@ -463,44 +441,30 @@ fn try_known_word_at(
   }
 }
 
-fn find_best_prev_pos(dp: Dict(Int, DpCell), pos: Int, end: Int) -> Int {
-  let init_score = case dict.get(dp, pos) {
-    Ok(cell) -> cell.score
-    Error(_) -> -1
+fn find_best_prev_pos(dp: Dict(Int, DpCell), start: Int, end: Int) -> Int {
+  let dp_score = fn(pos) {
+    dict.get(dp, pos) |> result.map(fn(c) { c.score }) |> result.unwrap(-1)
   }
-  find_best_prev_loop(dp, pos + 1, end, pos, init_score)
-}
-
-fn find_best_prev_loop(
-  dp: Dict(Int, DpCell),
-  pos: Int,
-  end: Int,
-  best_pos: Int,
-  best_score: Int,
-) -> Int {
-  case pos >= end {
-    True -> best_pos
-    False -> {
-      let score = case dict.get(dp, pos) {
-        Ok(cell) -> cell.score
-        Error(_) -> -1
-      }
-      case score > best_score {
-        True -> find_best_prev_loop(dp, pos + 1, end, pos, score)
-        False -> find_best_prev_loop(dp, pos + 1, end, best_pos, best_score)
-      }
+  int.range(from: start + 1, to: end, with: #(start, dp_score(start)), run: fn(
+    acc,
+    pos,
+  ) {
+    let score = dp_score(pos)
+    case score > acc.1 {
+      True -> #(pos, score)
+      False -> acc
     }
-  }
+  }).0
 }
 
 pub fn get_assessment(pct: Float) -> Assessment {
-  case pct <. 82.0, pct <. 87.0, pct <. 89.0, pct <. 92.0, pct <. 95.0 {
-    True, _, _, _, _ -> TooHard
-    _, True, _, _, _ -> VeryChallenging
-    _, _, True, _, _ -> Challenging
-    _, _, _, True, _ -> Optimal
-    _, _, _, _, True -> Comfortable
-    _, _, _, _, _ -> TooEasy
+  case pct {
+    p if p <. 82.0 -> TooHard
+    p if p <. 87.0 -> VeryChallenging
+    p if p <. 89.0 -> Challenging
+    p if p <. 92.0 -> Optimal
+    p if p <. 95.0 -> Comfortable
+    _ -> TooEasy
   }
 }
 
@@ -580,8 +544,8 @@ pub fn analyze(
             |> list.filter_map(fn(entry) {
               case entry {
                 #(word, #(count, False)) -> {
-                  let pinyin = get_pinyin(the_dict, word)
-                  let def = get_definition(the_dict, word)
+                  let pinyin = get_entry_field(the_dict, word, fn(e) { e.pinyin })
+                  let def = get_entry_field(the_dict, word, fn(e) { e.definition })
                   let truncated_def = case string.length(def) > 80 {
                     True -> string.slice(def, 0, 77) <> "..."
                     False -> def
@@ -592,12 +556,9 @@ pub fn analyze(
               }
             })
             |> list.sort(fn(a, b) {
-              int.compare(b.count, a.count)
-              |> fn(ord) {
-                case ord {
-                  order.Eq -> string.compare(a.word, b.word)
-                  _ -> ord
-                }
+              case int.compare(b.count, a.count) {
+                order.Eq -> string.compare(a.word, b.word)
+                ord -> ord
               }
             })
             |> list.take(max_unknown_display)
@@ -621,12 +582,24 @@ pub fn analyze(
 fn parse_level(val: String) -> Option(Int) {
   case val {
     "none" -> None
-    _ ->
-      case int.parse(val) {
-        Ok(n) -> Some(n)
-        Error(_) -> None
-      }
+    _ -> int.parse(val) |> option.from_result
   }
+}
+
+fn level_select(
+  current: Option(Int),
+  max_level: Int,
+  on_msg: fn(Option(Int)) -> Msg,
+) -> Element(Msg) {
+  let level_options =
+    int.range(from: max_level, to: 0, with: [], run: fn(acc, n) {
+      let s = int.to_string(n)
+      [html.option([value(s), selected(current == Some(n))], "Level " <> s), ..acc]
+    })
+  html.select(
+    [class("level-select"), event.on_change(fn(v) { on_msg(parse_level(v)) })],
+    [html.option([value("none"), selected(current == None)], "None"), ..level_options],
+  )
 }
 
 fn sidebar(model: Model) -> Element(Msg) {
@@ -634,51 +607,22 @@ fn sidebar(model: Model) -> Element(Msg) {
     html.h2([], [html.text("HSK Level")]),
     html.div([class("sidebar-section")], [
       html.h3([], [html.text("HSK 2.0")]),
-      html.select(
-        [
-          class("level-select"),
-          event.on_change(fn(val) { UserSelectedHskOld(parse_level(val)) }),
-        ],
-        [
-          html.option([value("none"), selected(model.hsk_old_level == None)], "None"),
-          html.option([value("1"), selected(model.hsk_old_level == Some(1))], "Level 1"),
-          html.option([value("2"), selected(model.hsk_old_level == Some(2))], "Level 2"),
-          html.option([value("3"), selected(model.hsk_old_level == Some(3))], "Level 3"),
-          html.option([value("4"), selected(model.hsk_old_level == Some(4))], "Level 4"),
-          html.option([value("5"), selected(model.hsk_old_level == Some(5))], "Level 5"),
-        ],
-      ),
+      level_select(model.hsk_old_level, 5, UserSelectedHskOld),
     ]),
     html.div([class("sidebar-section")], [
       html.h3([], [html.text("HSK 3.0 (New HSK)")]),
-      html.select(
-        [
-          class("level-select"),
-          event.on_change(fn(val) { UserSelectedHskNew(parse_level(val)) }),
-        ],
-        [
-          html.option([value("none"), selected(model.hsk_new_level == None)], "None"),
-          html.option([value("1"), selected(model.hsk_new_level == Some(1))], "Level 1"),
-          html.option([value("2"), selected(model.hsk_new_level == Some(2))], "Level 2"),
-          html.option([value("3"), selected(model.hsk_new_level == Some(3))], "Level 3"),
-        ],
-      ),
+      level_select(model.hsk_new_level, 3, UserSelectedHskNew),
     ]),
   ])
 }
 
 fn char_count_display(text: String) -> Element(Msg) {
   let count = string.length(text)
-  let warning = count >= 5000
-  html.div(
-    [
-      class(case warning {
-        True -> "char-count warning"
-        False -> "char-count"
-      }),
-    ],
-    [html.text(int.to_string(count) <> "/5000 characters")],
-  )
+  let cls = case count >= 5000 {
+    True -> "char-count warning"
+    False -> "char-count"
+  }
+  html.div([class(cls)], [html.text(int.to_string(count) <> "/5000 characters")])
 }
 
 fn results_panel(result: AnalysisResult) -> Element(Msg) {
@@ -743,12 +687,9 @@ fn unknown_words_table(words: List(UnknownWord)) -> Element(Msg) {
 
 fn float_to_string_1dp(f: Float) -> String {
   let whole = float.truncate(f)
-  let frac = float.truncate({ f -. int.to_float(whole) } *. 10.0)
-  let frac_abs = case frac < 0 {
-    True -> -frac
-    False -> frac
-  }
-  int.to_string(whole) <> "." <> int.to_string(frac_abs)
+  let frac =
+    float.truncate({ f -. int.to_float(whole) } *. 10.0) |> int.absolute_value
+  int.to_string(whole) <> "." <> int.to_string(frac)
 }
 
 fn main_content(model: Model) -> Element(Msg) {
