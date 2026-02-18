@@ -12,9 +12,8 @@
       devShells = forAllSystems (pkgs: {
         default = pkgs.mkShell {
           packages = with pkgs; [
-            gleam    # 1.14+ required by gleam_stdlib >= 0.44
+            gleam    # 1.14+ required by gleam_stdlib >= 0.44; also needed for tools/ (erlang target)
             nodejs   # JS runtime for gleam run + lustre dev tools
-            python3  # tools/generate_hsk_gleam.py, tools/preprocess_dictionary.py
           ];
 
           shellHook = ''
