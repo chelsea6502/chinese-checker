@@ -1,3 +1,4 @@
+import gleam/dict
 import gleam/option.{None, Some}
 import lustre
 import lustre/effect
@@ -6,13 +7,13 @@ import chinese_checker/analysis
 import chinese_checker/dictionary
 import chinese_checker/hsk
 import chinese_checker/model.{
-  type Model, type Msg, DictionaryLoaded, Model, UserClickedAnalyze,
+  type Model, type Msg, DictionaryLoaded, HskLoaded, Model, UserClickedAnalyze,
   UserClickedClear, UserSelectedHskNew, UserSelectedHskOld, UserUpdatedText,
 }
 import chinese_checker/view
 
 fn init(_flags: Nil) -> #(Model, effect.Effect(Msg)) {
-  #(model.init(), dictionary.fetch_dictionary())
+  #(model.init(), effect.batch([dictionary.fetch_dictionary(), hsk.fetch_hsk()]))
 }
 
 fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
@@ -30,11 +31,20 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
     )
 
     UserClickedAnalyze -> {
-      let known_words =
-        hsk.known_words_for_levels(model.hsk_old_level, model.hsk_new_level)
-      let result =
-        analysis.analyze(model.input_text, known_words, model.dictionary)
-      #(Model(..model, result: result), effect.none())
+      case model.hsk_words {
+        None -> #(model, effect.none())
+        Some(lists) -> {
+          let known_words =
+            hsk.known_words_for_levels(
+              lists,
+              model.hsk_old_level,
+              model.hsk_new_level,
+            )
+          let result =
+            analysis.analyze(model.input_text, known_words, model.dictionary)
+          #(Model(..model, result: result), effect.none())
+        }
+      }
     }
 
     UserClickedClear -> #(
@@ -42,12 +52,25 @@ fn update(model: Model, msg: Msg) -> #(Model, effect.Effect(Msg)) {
       effect.none(),
     )
 
-    DictionaryLoaded(Ok(dict)) -> #(
-      Model(..model, dictionary: dict, loading: False, error: None),
+    DictionaryLoaded(Ok(d)) -> {
+      let loading = case model.hsk_words {
+        Some(_) -> False
+        None -> True
+      }
+      #(Model(..model, dictionary: d, loading: loading, error: None), effect.none())
+    }
+
+    DictionaryLoaded(Error(err)) -> #(
+      Model(..model, loading: False, error: Some(err)),
       effect.none(),
     )
 
-    DictionaryLoaded(Error(err)) -> #(
+    HskLoaded(Ok(lists)) -> {
+      let loading = dict.size(model.dictionary) == 0
+      #(Model(..model, hsk_words: Some(lists), loading: loading), effect.none())
+    }
+
+    HskLoaded(Error(err)) -> #(
       Model(..model, loading: False, error: Some(err)),
       effect.none(),
     )
