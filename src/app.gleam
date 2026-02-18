@@ -115,8 +115,11 @@ fn decode_dictionary() -> decode.Decoder(Dict(String, DictEntry)) {
   decode.dict(decode.string, decode_entry())
 }
 
-@external(javascript, "./dictionary_ffi.mjs", "getOrigin")
+@external(javascript, "./analysis_ffi.mjs", "getOrigin")
 fn get_origin() -> String
+
+@external(javascript, "./analysis_ffi.mjs", "injectStyles")
+fn inject_styles() -> Nil
 
 fn fetch_dictionary() -> Effect(Msg) {
   effect.from(fn(dispatch) {
@@ -891,6 +894,7 @@ fn view(model: Model) -> Element(Msg) {
 // --- App ---
 
 fn init(_flags: Nil) -> #(Model, Effect(Msg)) {
+  inject_styles()
   #(default_model(), effect.batch([fetch_dictionary(), fetch_hsk()]))
 }
 
