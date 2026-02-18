@@ -20,11 +20,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Gleam + Erlang/OTP
+      - name: Set up Gleam + Erlang/OTP + rebar3
         uses: erlef/setup-beam@v1
         with:
           gleam-version: "1.14.0"
           otp-version: "27"
+          rebar3-version: "3"
 
       - name: Cache Gleam dependencies
         uses: actions/cache@v4
