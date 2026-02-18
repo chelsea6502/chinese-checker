@@ -118,9 +118,6 @@ fn decode_dictionary() -> decode.Decoder(Dict(String, DictEntry)) {
 @external(javascript, "./analysis_ffi.mjs", "getOrigin")
 fn get_origin() -> String
 
-@external(javascript, "./analysis_ffi.mjs", "injectStyles")
-fn inject_styles() -> Nil
-
 fn fetch_dictionary() -> Effect(Msg) {
   effect.from(fn(dispatch) {
     let url = get_origin() <> "/dictionary.json"
@@ -894,7 +891,6 @@ fn view(model: Model) -> Element(Msg) {
 // --- App ---
 
 fn init(_flags: Nil) -> #(Model, Effect(Msg)) {
-  inject_styles()
   #(default_model(), effect.batch([fetch_dictionary(), fetch_hsk()]))
 }
 
