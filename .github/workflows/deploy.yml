@@ -1,0 +1,62 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Gleam + Erlang/OTP
+        uses: erlef/setup-beam@v1
+        with:
+          gleam-version: "1.14.0"
+          otp-version: "27"
+
+      - name: Cache Gleam dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/packages
+          key: gleam-${{ hashFiles('manifest.toml') }}
+          restore-keys: gleam-
+
+      - name: Install dependencies
+        run: gleam deps download
+
+      - name: Build
+        run: gleam run -m lustre/dev build
+
+      - name: Fix absolute asset paths for subpath deployment
+        # The generated HTML uses root-absolute paths (/chinese_checker.js).
+        # Convert them to relative so the app works at any GitHub Pages URL.
+        run: |
+          sed -i 's|src="/chinese_checker.js"|src="./chinese_checker.js"|g' dist/index.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

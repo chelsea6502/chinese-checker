@@ -16,4 +16,4 @@ lustre_dev_tools = ">= 2.3.4 and < 3.0.0"
 [tools.lustre]
 
 [[tools.lustre.html.stylesheets]]
-href = "/css/styles.css"
+href = "css/styles.css"
