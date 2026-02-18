@@ -1,3 +1,5 @@
+@target(erlang)
+
 import gleam/dict
 import gleam/int
 import gleam/io
@@ -9,9 +11,9 @@ import simplifile
 
 // --- Dictionary preprocessing ---
 
-const cedict_path = "../definitions.txt"
+const cedict_path = "definitions.txt"
 
-const dict_output_path = "../assets/dictionary.json"
+const dict_output_path = "assets/dictionary.json"
 
 fn preprocess_dictionary() {
   io.println("Reading " <> cedict_path <> " ...")
@@ -96,9 +98,9 @@ fn to_option(result: Result(a, b)) -> Option(a) {
 
 // --- HSK word list generation ---
 
-const known_dir = "../known"
+const known_dir = "known"
 
-const hsk_output_path = "../assets/hsk.json"
+const hsk_output_path = "assets/hsk.json"
 
 const word_lists = [
   #("hsk1", "HSK1.txt"),
