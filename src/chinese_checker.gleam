@@ -12,6 +12,7 @@ import gleam/order
 import gleam/result
 import gleam/set.{type Set}
 import gleam/string
+import hsk
 import lustre
 import lustre/attribute.{class, disabled, id, selected, value}
 import lustre/effect.{type Effect}
@@ -23,19 +24,6 @@ import lustre/event
 
 pub type DictEntry {
   DictEntry(pinyin: String, definition: String)
-}
-
-pub type HskWordLists {
-  HskWordLists(
-    hsk1: Set(String),
-    hsk2: Set(String),
-    hsk3: Set(String),
-    hsk4: Set(String),
-    hsk5: Set(String),
-    band1: Set(String),
-    band2: Set(String),
-    band3: Set(String),
-  )
 }
 
 pub type Assessment {
@@ -74,7 +62,6 @@ pub type Model {
     hsk_new_level: Option(Int),
     result: Option(AnalysisResult),
     dictionary: Dict(String, DictEntry),
-    hsk_words: Option(HskWordLists),
     loading: Bool,
     error: Option(String),
   )
@@ -87,7 +74,6 @@ pub type Msg {
   UserClickedAnalyze
   UserClickedClear
   DictionaryLoaded(Result(Dict(String, DictEntry), String))
-  HskLoaded(Result(HskWordLists, String))
 }
 
 fn default_model() -> Model {
@@ -97,7 +83,6 @@ fn default_model() -> Model {
     hsk_new_level: None,
     result: None,
     dictionary: dict.new(),
-    hsk_words: None,
     loading: True,
     error: None,
   )
@@ -115,7 +100,7 @@ fn decode_dictionary() -> decode.Decoder(Dict(String, DictEntry)) {
   decode.dict(decode.string, decode_entry())
 }
 
-@external(javascript, "./analysis_ffi.mjs", "getOrigin")
+@external(javascript, "./ffi.mjs", "getOrigin")
 fn get_origin() -> String
 
 fn fetch_dictionary() -> Effect(Msg) {
@@ -159,67 +144,24 @@ fn get_definition(dictionary: Dict(String, DictEntry), word: String) -> String {
 
 // --- HSK ---
 
-fn decode_word_set() -> decode.Decoder(Set(String)) {
-  decode.list(decode.string)
-  |> decode.map(set.from_list)
-}
-
-fn decode_hsk_word_lists() -> decode.Decoder(HskWordLists) {
-  use hsk1 <- decode.field("hsk1", decode_word_set())
-  use hsk2 <- decode.field("hsk2", decode_word_set())
-  use hsk3 <- decode.field("hsk3", decode_word_set())
-  use hsk4 <- decode.field("hsk4", decode_word_set())
-  use hsk5 <- decode.field("hsk5", decode_word_set())
-  use band1 <- decode.field("band1", decode_word_set())
-  use band2 <- decode.field("band2", decode_word_set())
-  use band3 <- decode.field("band3", decode_word_set())
-  decode.success(HskWordLists(hsk1:, hsk2:, hsk3:, hsk4:, hsk5:, band1:, band2:, band3:))
-}
-
-fn fetch_hsk() -> Effect(Msg) {
-  effect.from(fn(dispatch) {
-    let url = get_origin() <> "/hsk.json"
-    case request.to(url) {
-      Error(_) -> dispatch(HskLoaded(Error("Invalid HSK URL")))
-      Ok(req) -> {
-        fetch.send(req)
-        |> promise.try_await(fetch.read_text_body)
-        |> promise.map(fn(resp_result) {
-          let result = case resp_result {
-            Error(_) -> Error("Failed to fetch HSK word lists")
-            Ok(response) ->
-              case json.parse(response.body, decode_hsk_word_lists()) {
-                Ok(lists) -> Ok(lists)
-                Error(_) -> Error("Failed to parse HSK JSON")
-              }
-          }
-          dispatch(HskLoaded(result))
-        })
-        Nil
-      }
-    }
-  })
-}
-
 fn known_words_for_levels(
-  lists: HskWordLists,
   old_level: Option(Int),
   new_level: Option(Int),
 ) -> Set(String) {
   let old = case old_level {
     None -> []
-    Some(1) -> [lists.hsk1]
-    Some(2) -> [lists.hsk1, lists.hsk2]
-    Some(3) -> [lists.hsk1, lists.hsk2, lists.hsk3]
-    Some(4) -> [lists.hsk1, lists.hsk2, lists.hsk3, lists.hsk4]
-    Some(5) -> [lists.hsk1, lists.hsk2, lists.hsk3, lists.hsk4, lists.hsk5]
+    Some(1) -> [hsk.hsk1()]
+    Some(2) -> [hsk.hsk1(), hsk.hsk2()]
+    Some(3) -> [hsk.hsk1(), hsk.hsk2(), hsk.hsk3()]
+    Some(4) -> [hsk.hsk1(), hsk.hsk2(), hsk.hsk3(), hsk.hsk4()]
+    Some(5) -> [hsk.hsk1(), hsk.hsk2(), hsk.hsk3(), hsk.hsk4(), hsk.hsk5()]
     Some(_) -> []
   }
   let new = case new_level {
     None -> []
-    Some(1) -> [lists.band1]
-    Some(2) -> [lists.band1, lists.band2]
-    Some(3) -> [lists.band1, lists.band2, lists.band3]
+    Some(1) -> [hsk.band1()]
+    Some(2) -> [hsk.band1(), hsk.band2()]
+    Some(3) -> [hsk.band1(), hsk.band2(), hsk.band3()]
     Some(_) -> []
   }
   list.fold(list.append(old, new), set.new(), set.union)
@@ -230,19 +172,6 @@ fn known_words_for_levels(
 const max_word_length = 4
 
 const max_unknown_display = 20
-
-@external(javascript, "./analysis_ffi.mjs", "segmentChinese")
-fn segment_chinese_ffi(text: String) -> String
-
-fn segment_with_jieba(text: String) -> List(String) {
-  case text {
-    "" -> []
-    _ ->
-      segment_chinese_ffi(text)
-      |> string.split("\n")
-      |> list.filter(fn(s) { s != "" })
-  }
-}
 
 fn is_cjk_char(cp: Int) -> Bool {
   cp >= 0x4E00 && cp <= 0x9FFF
@@ -339,10 +268,10 @@ fn do_segment_unknown(
           )
         None -> {
           let next_pos = find_next_dict_pos(graphemes, pos + 1, len, dict_keys)
-          let unmatched = substr(graphemes, pos, next_pos)
-          let jieba_segs = segment_with_jieba(unmatched)
+          let unmatched_chars =
+            graphemes |> list.drop(pos) |> list.take(next_pos - pos)
           let new_acc =
-            list.fold(list.reverse(jieba_segs), acc, fn(a, s) { [s, ..a] })
+            list.fold(list.reverse(unmatched_chars), acc, fn(a, s) { [s, ..a] })
           do_segment_unknown(graphemes, next_pos, len, dict_keys, new_acc)
         }
       }
@@ -891,7 +820,7 @@ fn view(model: Model) -> Element(Msg) {
 // --- App ---
 
 fn init(_flags: Nil) -> #(Model, Effect(Msg)) {
-  #(default_model(), effect.batch([fetch_dictionary(), fetch_hsk()]))
+  #(default_model(), fetch_dictionary())
 }
 
 fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
@@ -909,19 +838,10 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
     )
 
     UserClickedAnalyze -> {
-      case model.hsk_words {
-        None -> #(model, effect.none())
-        Some(lists) -> {
-          let known_words =
-            known_words_for_levels(
-              lists,
-              model.hsk_old_level,
-              model.hsk_new_level,
-            )
-          let result = analyze(model.input_text, known_words, model.dictionary)
-          #(Model(..model, result: result), effect.none())
-        }
-      }
+      let known_words =
+        known_words_for_levels(model.hsk_old_level, model.hsk_new_level)
+      let result = analyze(model.input_text, known_words, model.dictionary)
+      #(Model(..model, result: result), effect.none())
     }
 
     UserClickedClear -> #(
@@ -929,31 +849,12 @@ fn update(model: Model, msg: Msg) -> #(Model, Effect(Msg)) {
       effect.none(),
     )
 
-    DictionaryLoaded(Ok(d)) -> {
-      let loading = case model.hsk_words {
-        Some(_) -> False
-        None -> True
-      }
-      #(
-        Model(..model, dictionary: d, loading: loading, error: None),
-        effect.none(),
-      )
-    }
-
-    DictionaryLoaded(Error(err)) -> #(
-      Model(..model, loading: False, error: Some(err)),
+    DictionaryLoaded(Ok(d)) -> #(
+      Model(..model, dictionary: d, loading: False, error: None),
       effect.none(),
     )
 
-    HskLoaded(Ok(lists)) -> {
-      let loading = dict.size(model.dictionary) == 0
-      #(
-        Model(..model, hsk_words: Some(lists), loading: loading),
-        effect.none(),
-      )
-    }
-
-    HskLoaded(Error(err)) -> #(
+    DictionaryLoaded(Error(err)) -> #(
       Model(..model, loading: False, error: Some(err)),
       effect.none(),
     )
