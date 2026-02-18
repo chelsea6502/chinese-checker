@@ -13,6 +13,8 @@
         default = pkgs.mkShell {
           packages = with pkgs; [
             gleam    # 1.14+ required by gleam_stdlib >= 0.44; also needed for tools/ (erlang target)
+            erlang   # escript required by lustre_dev_tools
+            rebar3   # required by lustre_dev_tools
             nodejs   # JS runtime for gleam run + lustre dev tools
           ];
 
